@@ -4,7 +4,7 @@ import sys # used to end the game effectively
 # Screen dimensions
 WIDTH = 1280
 HEIGHT = 720
-SPEED = 2  # Movement speed of player
+SPEED = 2  # Movement speed of player # 2 for normal, 5 for speed increase, # 1 for slowness
 
 # Player class
 class Player:
