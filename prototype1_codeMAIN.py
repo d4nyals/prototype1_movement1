@@ -1,6 +1,6 @@
 import pygame
-import sys
-import os
+import sys # not needed
+import os # not needed
 
 # constants
 WIDTH = 1280
@@ -37,81 +37,4 @@ class Player:
             )
             self.images[direction] = scaled_image
 
-    def handle_input(self):
-        # move the player and change image based on direction
-        keys = pygame.key.get_pressed()
-        moved = False
 
-        if keys[pygame.K_w] or keys[pygame.K_UP]:
-            self.rect.y -= PLAYER_SPEED
-            self.direction = "up"
-            moved = True
-        elif keys[pygame.K_s] or keys[pygame.K_DOWN]:
-            self.rect.y += PLAYER_SPEED
-            self.direction = "down"
-            moved = True
-        elif keys[pygame.K_a] or keys[pygame.K_LEFT]:
-            self.rect.x -= PLAYER_SPEED
-            self.direction = "left"
-            moved = True
-        elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-            self.rect.x += PLAYER_SPEED
-            self.direction = "right"
-            moved = True
-
-        if moved:
-            self.image = self.images[self.direction]
-
-        # stop player leaving the screen
-        self.rect.clamp_ip(pygame.Rect(0, 0, WIDTH, HEIGHT))
-
-    def draw(self, screen):
-        # draw player on the screen
-        screen.blit(self.image, self.rect)
-
-
-class Game:
-    def __init__(self):
-        pygame.init()
-        self.setup_window()
-        self.clock = pygame.time.Clock()
-        self.running = True
-        self.player = Player((WIDTH // 2, HEIGHT // 2))
-
-    def setup_window(self):
-        # create the game window
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption("prototype1 - movement and menu ")
-
-    def handle_events(self):
-        # check for quit event
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-
-    def update(self):
-        # update player movement
-        self.player.handle_input()
-
-    def draw(self):
-        # draw background and player
-        self.screen.fill(BACKGROUND_COLOUR)
-        self.player.draw(self.screen)
-        pygame.display.flip()
-
-    def run(self):
-        # main game loop
-        while self.running:
-            self.handle_events()
-            self.update()
-            self.draw()
-            self.clock.tick(60)
-
-        pygame.quit()
-        sys.exit()
-
-
-# main program
-if __name__ == "__main__":
-    game = Game()
-    game.run()
