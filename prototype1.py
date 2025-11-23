@@ -6,7 +6,7 @@ height = 720 # original value = 720
 playerSpeed = 3 # original value = 3
 background_colour = (0, 0, 70) # original value = (0,0,51)
 scale_factor = 1.75 # original value = 1.75
-
+menu_colour = (100, 100, 100) # grey menu background
 
 class Wall(pygame.sprite.Sprite): # wall class
     def __init__(self, rect):
@@ -14,7 +14,6 @@ class Wall(pygame.sprite.Sprite): # wall class
         self.rect = pygame.Rect(rect)
         self.image = pygame.Surface(self.rect.size)
         self.image.fill((0, 0, 0))
-
 
 class Player: # player class
     def __init__(self, pos):
@@ -26,7 +25,6 @@ class Player: # player class
     def loadImages(self):
         # load and scale the player sprites
         playerImages = {"up": pygame.image.load("playerUp.png"), "down": pygame.image.load("playerDown.png"), "left": pygame.image.load("playerLeft.png"), "right": pygame.image.load("playerRight.png")}
-
         self.images = {}
         for direction, image in playerImages.items():
             w, h = image.get_size()
@@ -78,7 +76,6 @@ class Player: # player class
     def draw(self, screen): # draws the screen
         screen.blit(self.image, self.rect)
 
-
 class House: # house class
     def __init__(self, x, y, width, height, door_width=60, door_side=None): # creates the walls for house and adds the door gaps
         self.walls = pygame.sprite.Group()
@@ -102,8 +99,7 @@ class House: # house class
                 else:  # left // right
                     x = self.x if side == 'left' else self.x + self.width - 10
                     self.walls.add(Wall((x, self.y, 10, (self.height - door_size) // 2)))
-                    self.walls.add(
-                        Wall((x, self.y + (self.height + door_size) // 2, 10, (self.height - door_size) // 2)))
+                    self.walls.add(Wall((x, self.y + (self.height + door_size) // 2, 10, (self.height - door_size) // 2)))
             else:  # normal wall
                 if side == 'top':
                     self.walls.add(Wall((self.x, self.y, self.width, 10)))
@@ -114,20 +110,52 @@ class House: # house class
                 elif side == 'right':
                     self.walls.add(Wall((self.x + self.width - 10, self.y, 10, self.height)))
 
-
 class Game: # game class
     def __init__(self): # sets up everything for the game
         pygame.init()
         self.setupWindow()
         self.clock = pygame.time.Clock()
         self.running = True
-
+        self.menuScreen()  # show menu before player can move
         self.player = Player((width // 2, height // 2))
-        self.structures()  # creates teh houses
+        self.structures()  # creates the houses
 
     def setupWindow(self): # changes the window title
         self.screen = pygame.display.set_mode((width, height))
         pygame.display.set_caption("Top-down Zombie Game ~ Prototype 1")
+
+    def menuScreen(self): # menu screen
+        playButton = pygame.Rect(width//2 - 100, height//2 - 25, 200, 50)
+        font = pygame.font.Font(None, 50)
+        runningMenu = True
+        while runningMenu:
+            self.screen.fill(menu_colour)
+            mouse_pos = pygame.mouse.get_pos()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if playButton.collidepoint(mouse_pos):
+                        runningMenu = False
+
+            if playButton.collidepoint(mouse_pos):
+                pygame.draw.rect(self.screen, (200, 200, 200), playButton, 3)  # adds a shadowy effect when player hovers
+            else:
+                pygame.draw.rect(self.screen, (255, 255, 255), playButton, 3)  # normal colour
+
+            text = font.render("PLAY", True, (255, 255, 255))
+            text_rect = text.get_rect(center=playButton.center)
+            self.screen.blit(text, text_rect)
+
+            # title
+            title_font = pygame.font.Font(None, 80)
+            title_text = title_font.render("TOP-DOWN ZOMBIE GAME", True, (255, 255, 255))
+            title_rect = title_text.get_rect(center=(width//2, height//4))
+            self.screen.blit(title_text, title_rect)
+
+            pygame.display.flip()
+            self.clock.tick(60)
 
     def structures(self):
         # creates structures, such as houses for the player to use as cover
