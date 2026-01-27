@@ -76,7 +76,7 @@ class Player: # player class
     def draw(self, screen): # draws the screen
         screen.blit(self.image, self.rect)
 
-class House: # house class
+class House: # house structure class, primarily used for dimensions of the house
     def __init__(self, x, y, width, height, door_width=60, door_side=None): # creates the walls for house and adds the door gaps
         self.walls = pygame.sprite.Group()
         self.x = x
@@ -88,11 +88,11 @@ class House: # house class
         self.create_walls()
 
     def create_walls(self): # creates the walls needed for the houses / structures
-        door_size = 60
-        sides = ['top', 'bottom', 'left', 'right']
+        door_size = 60 # gap created for the player to enter the structures
+        sides = ['top', 'bottom', 'left', 'right'] # labels for the walls and wall position
         for side in sides:
             if self.door_side == side:
-                if side in ['top', 'bottom']:
+                if side in ['top', 'bottom']:  
                     y = self.y if side == 'top' else self.y + self.height - 10
                     self.walls.add(Wall((self.x, y, (self.width - door_size) // 2, 10)))
                     self.walls.add(Wall((self.x + (self.width + door_size) // 2, y, (self.width - door_size) // 2, 10)))
@@ -121,8 +121,8 @@ class Game: # game class
         self.structures()  # creates the houses
 
     def setupWindow(self): # changes the window title
-        self.screen = pygame.display.set_mode((width, height))
-        pygame.display.set_caption("Top-down Zombie Game ~ Prototype 1")
+        self.screen = pygame.display.set_mode((width, height)) # dimensions related to window title
+        pygame.display.set_caption("Top-down Zombie Game ~ Prototype 1") # Title caption
 
     def menuScreen(self): # menu screen
         playButton = pygame.Rect(width//2 - 100, height//2 - 25, 200, 50)
@@ -144,7 +144,7 @@ class Game: # game class
             else:
                 pygame.draw.rect(self.screen, (255, 255, 255), playButton, 3)  # normal colour
 
-            text = font.render("PLAY", True, (255, 255, 255))
+            text = font.render("PLAY", True, (255, 255, 255)) # Play button text 
             text_rect = text.get_rect(center=playButton.center)
             self.screen.blit(text, text_rect)
 
