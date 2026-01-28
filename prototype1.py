@@ -1,19 +1,19 @@
 import pygame # imports pygame
 
 # variables
-width = 1280 # original value = 1280
-height = 720 # original value = 720
+width = 1280 # width of screen - original value = 1280
+height = 720 # height of screen - original value = 720
 playerSpeed = 3 # original value = 3
 background_colour = (0, 0, 70) # original value = (0,0,51)
-scale_factor = 1.75 # original value = 1.75
+scale_factor = 1.75 # scales the playerImage - original value = 1.75
 menu_colour = (100, 100, 100) # grey menu background
 
 class Wall(pygame.sprite.Sprite): # wall class
     def __init__(self, rect):
-        super().__init__() # super used
-        self.rect = pygame.Rect(rect)
+        super().__init__() # used to initialise parent class correctly
+        self.rect = pygame.Rect(rect) # pos + size of wall, using for collision
         self.image = pygame.Surface(self.rect.size)
-        self.image.fill((0, 0, 0))
+        self.image.fill((0, 0, 0)) # fill image colour with black
 
 class Player: # player class
     def __init__(self, pos):
