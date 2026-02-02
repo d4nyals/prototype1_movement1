@@ -25,16 +25,14 @@ class Player: # player class
         self.image = self.images[self.direction]
         self.rect = self.image.get_rect(center=pos)
 
-    def loadImages(self):
-        # load and scale the player sprites
-        playerImages = {"up": pygame.image.load("playerUp.png"), "down": pygame.image.load("playerDown.png"), "left": pygame.image.load("playerLeft.png"), "right": pygame.image.load("playerRight.png")}
+    def loadImages(self): # load and scale the player sprites
+        playerImages = {"up": pygame.image.load("playerUp.png"), "down": pygame.image.load("playerDown.png"), "left": pygame.image.load("playerLeft.png"), "right": pygame.image.load("playerRight.png")} # PLAYER IMAGES
         self.images = {}
         for direction, image in playerImages.items():
             w, h = image.get_size()
             self.images[direction] = pygame.transform.scale(image, (int(w * scale_factor), int(h * scale_factor)))
 
-    def collisionMovement(self, dx, dy, walls):
-        # move sideways then check for collisions
+    def collisionMovement(self, dx, dy, walls):  # move sideways then check for collisions
         self.rect.x += dx
         for wall in walls:
             if self.rect.colliderect(wall.rect):
@@ -137,16 +135,16 @@ class Game: # game class
     def __init__(self): # sets up everything for the game
         pygame.init()
         self.setupWindow()
-        self.clock = pygame.time.Clock()
+        self.clock = pygame.time.Clock() # acts as a time counter
         self.running = True
         self.menuScreen()  # show menu before player can move
         self.player = Player((width // 2, height // 2))
         self.structures()  # creates the houses
-        self.bullets = [] # --- ADDED ---
+        self.bullets = [] # creates a list for bullets
 
     def setupWindow(self): # changes the window title
         self.screen = pygame.display.set_mode((width, height)) # dimensions related to window title
-        pygame.display.set_caption("Top-down Zombie Game ~ Prototype 1") # Title caption
+        pygame.display.set_caption("Top-down Zombie Game") # window caption
 
     def menuScreen(self): # menu screen
         playButton = pygame.Rect(width//2 - 100, height//2 - 25, 200, 50)
@@ -168,7 +166,7 @@ class Game: # game class
             else:
                 pygame.draw.rect(self.screen, (255, 255, 255), playButton, 3)
 
-            text = font.render("PLAY", True, (255, 255, 255))
+            text = font.render("PLAY", True, (255, 255, 255)) # Play text button
             text_rect = text.get_rect(center=playButton.center)
             self.screen.blit(text, text_rect)
 
@@ -204,27 +202,20 @@ class Game: # game class
                     self.bullets.append(bullet)
             # --- END ---
 
-    def update(self):
-        # update player movement
+    def update(self):  # update player movement
         self.player.handleInput(self.walls)
-
-        # --- ADDED ---
-        for bullet in self.bullets[:]:
+        for bullet in self.bullets[:]: # making a copy of the bullet list
             bullet.move()
             if bullet.rect.right < 0 or bullet.rect.left > width or bullet.rect.bottom < 0 or bullet.rect.top > height:
-                self.bullets.remove(bullet)
-        # --- END ---
-
-    def draw(self):
-        # draw background and objects
+                self.bullets.remove(bullet) # removes bullet once it leaves the screen
+      
+    def draw(self): # draw background and objects
         self.screen.fill(background_colour)
         for wall in self.walls:
-            self.screen.blit(wall.image, wall.rect)
-
-        # --- ADDED ---
+            self.screen.blit(wall.image, wall.rect) 
         for bullet in self.bullets:
-            bullet.draw(self.screen)
-        # --- END ---
+            bullet.draw(self.screen) # draws the bullet onto the screen
+      
 
         self.player.draw(self.screen)
         pygame.display.flip()
