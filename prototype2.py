@@ -50,7 +50,7 @@ class Player: # player class
                 elif dy < 0:
                     self.rect.top = wall.rect.bottom
 
-    def handleInput(self, walls): # handles the key movements (WASD) also arrow keys
+    def handleInput(self, walls): # handles the input in game (key movements (WASD) also arrow keys)
         keys = pygame.key.get_pressed()
         dx, dy = 0, 0
 
@@ -70,9 +70,7 @@ class Player: # player class
         if dx or dy:
             self.image = self.images[self.direction]
             self.collisionMovement(dx, dy, walls)
-
-        # stops the player from leaving the screen
-        self.rect.clamp_ip(pygame.Rect(0, 0, width, height))
+        self.rect.clamp_ip(pygame.Rect(0, 0, width, height)) # stops the player from leaving the screen
 
     def draw(self, screen): # draws the screen
         screen.blit(self.image, self.rect)
@@ -82,20 +80,18 @@ class Bullet: # bullet class
     def __init__(self, x, y, direction):
         self.rect = pygame.Rect(x, y, 6, 6) # bullet size
         self.direction = direction
-
+        
     def move(self):
-        if self.direction == "up":
+        if self.direction == "up": # player goes up
             self.rect.y -= bulletSpeed
-        elif self.direction == "down":
+        elif self.direction == "down": # player goes down
             self.rect.y += bulletSpeed
-        elif self.direction == "left":
+        elif self.direction == "left": # player goes left
             self.rect.x -= bulletSpeed
-        elif self.direction == "right":
+        elif self.direction == "right": # player goes right
             self.rect.x += bulletSpeed
-
     def draw(self, screen):
-        pygame.draw.rect(screen, (255, 255, 0), self.rect)
-# --- END ---
+        pygame.draw.rect(screen, (255, 255, 0), self.rect) # draws bullet 
 
 class House: # house structure class, primarily used for dimensions of the house
     def __init__(self, x, y, width, height, door_width=60, door_side=None): # creates the walls for house and adds the door gaps
@@ -171,40 +167,32 @@ class Game: # game class
             self.screen.blit(text, text_rect)
 
             title_font = pygame.font.Font(None, 80)
-            title_text = title_font.render("TOP-DOWN ZOMBIE GAME", True, (255, 255, 255))
+            title_text = title_font.render("TOP-DOWN ZOMBIE GAME", True, (255, 255, 255)) # title caption
             title_rect = title_text.get_rect(center=(width//2, height//4))
             self.screen.blit(title_text, title_rect)
 
             pygame.display.flip()
             self.clock.tick(60)
 
-    def structures(self):
-        # creates structures, such as houses for the player to use as cover
+    def structures(self): # creates structures, such as houses for the player to use as cover
         self.walls = pygame.sprite.Group()
-
-        # top house (rectangle)
-        top_left_house = House(200, 120, 300, 150, door_side='bottom')
+        top_left_house = House(200, 120, 300, 150, door_side='bottom')  # top house (rectangle)
         self.walls.add(top_left_house.walls)
-        # bottom house
-        bottom_right_house = House(900, 400, 180, 180, door_side='top')
+        bottom_right_house = House(900, 400, 180, 180, door_side='top') # bottom house
         self.walls.add(bottom_right_house.walls)
 
-    def handleEvents(self):
-        # basic quit event
+    def handleEvents(self): # handles the events needed to close game, use items etc.
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            if event.type == pygame.QUIT: # quit event
                 self.running = False
-
-            # PROTOTYPE 2 ~ BULLET
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    bullet = Bullet(self.player.rect.centerx, self.player.rect.centery, self.player.direction)
+                    bullet = Bullet(self.player.rect.centerx, self.player.rect.centery, self.player.direction) # bullet
                     self.bullets.append(bullet)
-            # --- END ---
 
-    def update(self):  # update player movement
+    def update(self):  # update actions
         self.player.handleInput(self.walls)
-        for bullet in self.bullets[:]: # making a copy of the bullet list
+        for bullet in self.bullets[:]: # making a copy of the bullet list using iteration
             bullet.move()
             if bullet.rect.right < 0 or bullet.rect.left > width or bullet.rect.bottom < 0 or bullet.rect.top > height:
                 self.bullets.remove(bullet) # removes bullet once it leaves the screen
@@ -218,12 +206,12 @@ class Game: # game class
       
 
         self.player.draw(self.screen)
-        pygame.display.flip()
+        pygame.display.flip() # update the contents of the entire display
 
 game = Game() # used to execute the game
 
 while game.running:
-    game.handleEvents()
-    game.update()
-    game.draw()
-    game.clock.tick(60) # FPS for game
+    game.handleEvents() # handling events in game
+    game.update() # update game
+    game.draw() # draw in game
+    game.clock.tick(60) # FPS for game -- SET TO 60
