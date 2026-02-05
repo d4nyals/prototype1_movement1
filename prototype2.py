@@ -139,7 +139,7 @@ class Game: # game class
         self.bullets = [] # creates a list for bullets
 
     def setupWindow(self): # changes the window title
-        self.screen = pygame.display.set_mode((width, height)) # dimensions related to window title
+        self.screen = pygame.display.set_mode((width, height)) # dimensions for window
         pygame.display.set_caption("Top-down Zombie Game") # window caption
 
     def menuScreen(self): # menu screen
@@ -205,7 +205,7 @@ class Game: # game class
             bullet.draw(self.screen) # draws the bullet onto the screen
       
 
-        self.player.draw(self.screen)
+        self.player.draw(self.screen) # draw screen
         pygame.display.flip() # update the contents of the entire display
 
 game = Game() # used to execute the game
