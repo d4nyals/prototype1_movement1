@@ -7,8 +7,8 @@ playerSpeed = 3 # original value = 3
 background_colour = (0, 0, 70) # original value = (0,0,51)
 scale_factor = 1.75 # scales the playerImage - original value = 1.75
 menu_colour = (100, 100, 100) # grey menu background
-# --- ADDED ---
-bulletSpeed = 8 # speed of bullets
+
+bulletSpeed = 10 # speed of bullets 
 
 
 class Wall(pygame.sprite.Sprite): # wall class
@@ -75,7 +75,6 @@ class Player: # player class
     def draw(self, screen): # draws the screen
         screen.blit(self.image, self.rect)
 
-# --- ADDED ---
 class Bullet: # bullet class
     def __init__(self, x, y, direction):
         self.rect = pygame.Rect(x, y, 6, 6) # bullet size
@@ -157,8 +156,8 @@ class Game: # game class
                     if playButton.collidepoint(mouse_pos):
                         runningMenu = False
 
-            if playButton.collidepoint(mouse_pos):
-                pygame.draw.rect(self.screen, (200, 200, 200), playButton, 3)
+            if playButton.collidepoint(mouse_pos): # adds an effect which indicates that the player is hovering over play button
+                pygame.draw.rect(self.screen, (255, 255, 0), playButton, 3)
             else:
                 pygame.draw.rect(self.screen, (255, 255, 255), playButton, 3)
 
@@ -167,7 +166,7 @@ class Game: # game class
             self.screen.blit(text, text_rect)
 
             title_font = pygame.font.Font(None, 80)
-            title_text = title_font.render("TOP-DOWN ZOMBIE GAME", True, (255, 255, 255)) # title caption
+            title_text = title_font.render("TOP-DOWN ZOMBIE GAME", True, (0, 255, 0)) # title caption
             title_rect = title_text.get_rect(center=(width//2, height//4))
             self.screen.blit(title_text, title_rect)
 
