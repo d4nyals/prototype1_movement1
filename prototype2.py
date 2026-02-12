@@ -4,11 +4,11 @@ import pygame # imports pygame
 width = 1280 # width of screen - original value = 1280
 height = 720 # height of screen - original value = 720
 playerSpeed = 3 # original value = 3
-background_colour = (0, 0, 70) # original value = (0,0,51)
-scale_factor = 1.75 # scales the playerImage - original value = 1.75
+background_colour = (100, 90, 100) # original value = (0,0,51)
+scale_factor = 1 # scales the playerImage - original value = 1.75
 menu_colour = (100, 100, 100) # grey menu background
 
-bulletSpeed = 10 # speed of bullets 
+bulletSpeed = 11 # speed of bullets 
 
 
 class Wall(pygame.sprite.Sprite): # wall class
@@ -40,9 +40,7 @@ class Player: # player class
                     self.rect.right = wall.rect.left
                 elif dx < 0:
                     self.rect.left = wall.rect.right
-
-        # move vertically then check for collisions
-        self.rect.y += dy
+        self.rect.y += dy  # move vertically then check for collisions
         for wall in walls:
             if self.rect.colliderect(wall.rect):
                 if dy > 0:
@@ -66,7 +64,6 @@ class Player: # player class
         elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
             dx = playerSpeed
             self.direction = "right"
-
         if dx or dy:
             self.image = self.images[self.direction]
             self.collisionMovement(dx, dy, walls)
@@ -80,7 +77,7 @@ class Bullet: # bullet class
         self.rect = pygame.Rect(x, y, 6, 6) # bullet size
         self.direction = direction
         
-    def move(self):
+    def moveBullet(self):
         if self.direction == "up": # player goes up
             self.rect.y -= bulletSpeed
         elif self.direction == "down": # player goes down
@@ -165,11 +162,10 @@ class Game: # game class
             text_rect = text.get_rect(center=playButton.center)
             self.screen.blit(text, text_rect)
 
-            title_font = pygame.font.Font(None, 80)
-            title_text = title_font.render("TOP-DOWN ZOMBIE GAME", True, (0, 255, 0)) # title caption
+            title_font = pygame.font.Font("Comic Sans MS.ttf", 70)
+            title_text = title_font.render("ZOMBIE RUSH", True, (0, 255, 0)) # title caption
             title_rect = title_text.get_rect(center=(width//2, height//4))
             self.screen.blit(title_text, title_rect)
-
             pygame.display.flip()
             self.clock.tick(60)
 
@@ -185,14 +181,14 @@ class Game: # game class
             if event.type == pygame.QUIT: # quit event
                 self.running = False
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_SPACE: #or pygame.MOUSEBUTTONUP: <-- powerup
                     bullet = Bullet(self.player.rect.centerx, self.player.rect.centery, self.player.direction) # bullet
                     self.bullets.append(bullet)
 
     def update(self):  # update actions
         self.player.handleInput(self.walls)
         for bullet in self.bullets[:]: # making a copy of the bullet list using iteration
-            bullet.move()
+            bullet.moveBullet()
             if bullet.rect.right < 0 or bullet.rect.left > width or bullet.rect.bottom < 0 or bullet.rect.top > height:
                 self.bullets.remove(bullet) # removes bullet once it leaves the screen
       
@@ -202,8 +198,6 @@ class Game: # game class
             self.screen.blit(wall.image, wall.rect) 
         for bullet in self.bullets:
             bullet.draw(self.screen) # draws the bullet onto the screen
-      
-
         self.player.draw(self.screen) # draw screen
         pygame.display.flip() # update the contents of the entire display
 
