@@ -1,0 +1,378 @@
+import pygame
+import random
+import time
+
+# Game variables
+width = 1280
+height = 720
+playerSpeed = 3
+bulletSpeed = 11
+scale_factor = 1.5
+background_colour = (100, 90, 100)
+menu_colour = (100, 100, 100)
+tile_size = 40  # Grid tile size for A*
+
+# -----------------------------------
+# Classes
+# -----------------------------------
+
+class Wall(pygame.sprite.Sprite):
+    def __init__(self, rect):
+        super().__init__()
+        self.rect = pygame.Rect(rect)
+        self.image = pygame.Surface(self.rect.size)
+        self.image.fill((0, 0, 0))
+
+class Player:
+    def __init__(self, pos):
+        self.loadImages()
+        self.direction = "down"
+        self.image = self.images[self.direction]
+        self.rect = self.image.get_rect(center=pos)
+        self.max_health = 100
+        self.health = 100
+        self.score = 0
+
+    def loadImages(self):
+        playerImages = {
+            "up": pygame.image.load("playerUp.png"),
+            "down": pygame.image.load("playerDown.png"),
+            "left": pygame.image.load("playerLeft.png"),
+            "right": pygame.image.load("playerRight.png")
+        }
+        self.images = {}
+        for direction, image in playerImages.items():
+            w, h = image.get_size()
+            self.images[direction] = pygame.transform.scale(image, (int(w*scale_factor), int(h*scale_factor)))
+
+    def handleInput(self, walls):
+        keys = pygame.key.get_pressed()
+        dx, dy = 0, 0
+        if keys[pygame.K_w] or keys[pygame.K_UP]:
+            dy = -playerSpeed
+            self.direction = "up"
+        elif keys[pygame.K_s] or keys[pygame.K_DOWN]:
+            dy = playerSpeed
+            self.direction = "down"
+        elif keys[pygame.K_a] or keys[pygame.K_LEFT]:
+            dx = -playerSpeed
+            self.direction = "left"
+        elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+            dx = playerSpeed
+            self.direction = "right"
+        if dx or dy:
+            self.image = self.images[self.direction]
+            self.collisionMovement(dx, dy, walls)
+        self.rect.clamp_ip(pygame.Rect(0, 0, width, height))
+
+    def collisionMovement(self, dx, dy, walls):
+        self.rect.x += dx
+        for wall in walls:
+            if self.rect.colliderect(wall.rect):
+                if dx > 0:
+                    self.rect.right = wall.rect.left
+                elif dx < 0:
+                    self.rect.left = wall.rect.right
+        self.rect.y += dy
+        for wall in walls:
+            if self.rect.colliderect(wall.rect):
+                if dy > 0:
+                    self.rect.bottom = wall.rect.top
+                elif dy < 0:
+                    self.rect.top = wall.rect.bottom
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+
+    def drawHealthBar(self, screen):
+        bar_width = 200
+        bar_height = 20
+        x = width - bar_width - 20
+        y = height - bar_height - 20
+        health_ratio = self.health / self.max_health
+        pygame.draw.rect(screen, (100,100,100), (x,y,bar_width,bar_height))
+        pygame.draw.rect(screen, (255,0,0), (x,y,int(bar_width*health_ratio),bar_height))
+        font = pygame.font.Font(None,25)
+        text = font.render(f"Health: {self.health}/{self.max_health}", True,(255,255,255))
+        screen.blit(text,(x+5,y-20))
+
+class Bullet:
+    def __init__(self, x, y, direction):
+        self.rect = pygame.Rect(x, y, 6, 6)
+        self.direction = direction
+
+    def moveBullet(self, walls):
+        if self.direction == "up":
+            self.rect.y -= bulletSpeed
+        elif self.direction == "down":
+            self.rect.y += bulletSpeed
+        elif self.direction == "left":
+            self.rect.x -= bulletSpeed
+        elif self.direction == "right":
+            self.rect.x += bulletSpeed
+        for wall in walls:
+            if self.rect.colliderect(wall.rect):
+                return True
+        return False
+
+    def draw(self, screen):
+        pygame.draw.rect(screen,(255,255,0),self.rect)
+
+class House:
+    def __init__(self, x, y, width, height, door_width=60, door_side=None, vertical_door=None):
+        self.walls = pygame.sprite.Group()
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.door_width = door_width
+        self.door_side = door_side
+        self.vertical_door = vertical_door
+        self.create_walls()
+
+    def create_walls(self):
+        door_size = 60
+        sides = ['top', 'bottom', 'left', 'right']
+        for side in sides:
+            if self.door_side == side and side in ['top','bottom']:
+                y = self.y if side=='top' else self.y+self.height-10
+                self.walls.add(Wall((self.x, y, (self.width-door_size)//2, 10)))
+                self.walls.add(Wall((self.x+(self.width+door_size)//2, y, (self.width-door_size)//2, 10)))
+            elif self.vertical_door==side and side in ['left','right']:
+                x = self.x if side=='left' else self.x+self.width-10
+                self.walls.add(Wall((x, self.y, 10, (self.height-door_size)//2)))
+                self.walls.add(Wall((x, self.y+(self.height+door_size)//2, 10, (self.height-door_size)//2)))
+            else:
+                if side=='top':
+                    self.walls.add(Wall((self.x, self.y, self.width, 10)))
+                elif side=='bottom':
+                    self.walls.add(Wall((self.x, self.y+self.height-10, self.width, 10)))
+                elif side=='left':
+                    self.walls.add(Wall((self.x, self.y, 10, self.height)))
+                elif side=='right':
+                    self.walls.add(Wall((self.x+self.width-10, self.y, 10, self.height)))
+
+# -----------------------------------
+# Pathfinding
+# -----------------------------------
+
+class Node:
+    def __init__(self, position, parent=None):
+        self.position = position
+        self.parent = parent
+        self.g = 0
+        self.h = 0
+        self.f = 0
+    def __eq__(self, other):
+        return self.position == other.position
+
+def aStarPath(grid,start,end):
+    open_list = []
+    closed_list = []
+    start_node = Node(start)
+    end_node = Node(end)
+    open_list.append(start_node)
+    while open_list:
+        current_node = min(open_list,key=lambda node: node.f)
+        open_list.remove(current_node)
+        closed_list.append(current_node)
+        if current_node == end_node:
+            path = []
+            current = current_node
+            while current is not None:
+                path.append(current.position)
+                current = current.parent
+            return path[::-1]
+        for new_position in [(0,-1),(0,1),(-1,0),(1,0)]:
+            node_pos = (current_node.position[0]+new_position[0],current_node.position[1]+new_position[1])
+            if 0<=node_pos[0]<len(grid) and 0<=node_pos[1]<len(grid[0]):
+                if grid[node_pos[0]][node_pos[1]]==0:
+                    new_node = Node(node_pos,current_node)
+                    if new_node not in closed_list:
+                        new_node.g = current_node.g+1
+                        new_node.h = abs(node_pos[0]-end_node.position[0])+abs(node_pos[1]-end_node.position[1])
+                        new_node.f = new_node.g + new_node.h
+                        if all(not (new_node==n and new_node.g>n.g) for n in open_list):
+                            open_list.append(new_node)
+    return []
+
+# -----------------------------------
+# Zombie Class
+# -----------------------------------
+
+class Zombie:
+    def __init__(self,pos):
+        self.image = pygame.image.load("zombie.png")
+        w,h = self.image.get_size()
+        self.image = pygame.transform.scale(self.image,(int(w*scale_factor),int(h*scale_factor)))
+        self.rect = self.image.get_rect(center=pos)
+        self.speed = 2
+        self.path = []
+        self.last_path_update = time.time()
+
+    def updatePath(self,grid,player_tile):
+        if time.time()-self.last_path_update>0.5:
+            zombie_tile = (self.rect.x//tile_size,self.rect.y//tile_size)
+            self.path = aStarPath(grid,zombie_tile,player_tile)
+            self.last_path_update = time.time()
+
+    def followPath(self):
+        if self.path:
+            target = self.path[0]
+            zombieX = target[0]*tile_size
+            zombieY = target[1]*tile_size
+            if abs(self.rect.x-zombieX)<5 and abs(self.rect.y-zombieY)<5:
+                self.path.pop(0)
+            else:
+                if self.rect.x < zombieX: self.rect.x += self.speed
+                if self.rect.x > zombieX: self.rect.x -= self.speed
+                if self.rect.y < zombieY: self.rect.y += self.speed
+                if self.rect.y > zombieY: self.rect.y -= self.speed
+
+    def draw(self,screen):
+        screen.blit(self.image,self.rect)
+
+# -----------------------------------
+# Game Class
+# -----------------------------------
+
+class Game:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((width,height))
+        pygame.display.set_caption("Top-down Zombie Game")
+        self.clock = pygame.time.Clock()
+        self.running = True
+        self.menuScreen()
+        self.player = Player((width//2,height//2))
+        self.structures()
+        self.bullets = []
+        self.zombies = []
+        self.max_zombies = 5
+        self.grid = self.createGrid()
+
+    def menuScreen(self):
+        playButton = pygame.Rect(width//2-100,height//2-25,200,50)
+        font = pygame.font.Font(None,50)
+        runningMenu = True
+        while runningMenu:
+            self.screen.fill(menu_colour)
+            mouse_pos = pygame.mouse.get_pos()
+            for event in pygame.event.get():
+                if event.type==pygame.QUIT:
+                    pygame.quit()
+                    exit()
+                elif event.type==pygame.MOUSEBUTTONDOWN:
+                    if playButton.collidepoint(mouse_pos):
+                        runningMenu = False
+            if playButton.collidepoint(mouse_pos):
+                pygame.draw.rect(self.screen,(255,255,0),playButton,3)
+            else:
+                pygame.draw.rect(self.screen,(255,255,255),playButton,3)
+            text = font.render("PLAY",True,(255,255,255))
+            text_rect = text.get_rect(center=playButton.center)
+            self.screen.blit(text,text_rect)
+            title_font = pygame.font.Font(None,70)
+            title_text = title_font.render("ZOMBIE RUSH",True,(0,255,0))
+            title_rect = title_text.get_rect(center=(width//2,height//4))
+            self.screen.blit(title_text,title_rect)
+            pygame.display.flip()
+            self.clock.tick(60)
+
+    def structures(self):
+        self.walls = pygame.sprite.Group()
+        top_left_house = House(200,120,300,150,door_side='bottom',vertical_door='left')
+        self.walls.add(top_left_house.walls)
+        bottom_right_house = House(900,400,180,180,door_side='top',vertical_door='right')
+        self.walls.add(bottom_right_house.walls)
+
+    def createGrid(self):
+        grid_width = width//tile_size
+        grid_height = height//tile_size
+        grid = [[0 for _ in range(grid_height)] for _ in range(grid_width)]
+        for wall in self.walls:
+            start_x = wall.rect.x//tile_size
+            start_y = wall.rect.y//tile_size
+            end_x = (wall.rect.x+wall.rect.width)//tile_size
+            end_y = (wall.rect.y+wall.rect.height)//tile_size
+            for x in range(start_x,end_x):
+                for y in range(start_y,end_y):
+                    if 0<=x<grid_width and 0<=y<grid_height:
+                        grid[x][y] = 1
+        return grid
+
+    def spawnZombie(self):
+        if len(self.zombies)<self.max_zombies:
+            side = random.choice(['top','bottom','left','right'])
+            if side=='top':
+                pos = (random.randint(0,width),0)
+            elif side=='bottom':
+                pos = (random.randint(0,width),height)
+            elif side=='left':
+                pos = (0,random.randint(0,height))
+            else:
+                pos = (width,random.randint(0,height))
+            self.zombies.append(Zombie(pos))
+
+    def handleEvents(self):
+        for event in pygame.event.get():
+            if event.type==pygame.QUIT:
+                self.running = False
+            if event.type==pygame.KEYDOWN:
+                if event.key==pygame.K_SPACE:
+                    bullet = Bullet(self.player.rect.centerx,self.player.rect.centery,self.player.direction)
+                    self.bullets.append(bullet)
+
+    def update(self):
+        self.player.handleInput(self.walls)
+        # bullets
+        for bullet in self.bullets[:]:
+            if bullet.moveBullet(self.walls) or bullet.rect.right<0 or bullet.rect.left>width or bullet.rect.bottom<0 or bullet.rect.top>height:
+                self.bullets.remove(bullet)
+        # spawn zombies only if less than max
+        if len(self.zombies)<self.max_zombies:
+            self.spawnZombie()
+        player_tile = (self.player.rect.x//tile_size,self.player.rect.y//tile_size)
+        for zombie in self.zombies[:]:
+            zombie.updatePath(self.grid,player_tile)
+            zombie.followPath()
+            if zombie.rect.colliderect(self.player.rect):
+                self.player.health -= 1
+            for bullet in self.bullets[:]:
+                if zombie.rect.colliderect(bullet.rect):
+                    self.bullets.remove(bullet)
+                    self.zombies.remove(zombie)
+                    self.player.score += 1
+                    break
+
+    def drawScoreBar(self):
+        scoreBar_rect = pygame.Rect(20,20,150,40)
+        pygame.draw.rect(self.screen,(100,100,100),scoreBar_rect)
+        font = pygame.font.Font(None,30)
+        text = font.render(f"Score: {self.player.score}",True,(255,255,255))
+        self.screen.blit(text,(scoreBar_rect.x+10,scoreBar_rect.y+5))
+
+    def draw(self):
+        self.screen.fill(background_colour)
+        for wall in self.walls:
+            self.screen.blit(wall.image,wall.rect)
+        for bullet in self.bullets:
+            bullet.draw(self.screen)
+        for zombie in self.zombies:
+            zombie.draw(self.screen)
+        self.player.draw(self.screen)
+        self.player.drawHealthBar(self.screen)
+        self.drawScoreBar()
+        pygame.display.flip()
+
+# -----------------------------------
+# Main Loop
+# -----------------------------------
+
+game = Game()
+
+while game.running:
+    game.handleEvents()
+    game.update()
+    game.draw()
+    game.clock.tick(60)
