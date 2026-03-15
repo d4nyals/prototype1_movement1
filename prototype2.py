@@ -1,4 +1,5 @@
 import pygame  # imports pygame
+import random  # used for zombie spawning
 
 # variables
 width = 1280  # width of screen - original value = 1280
@@ -7,230 +8,267 @@ playerSpeed = 3  # original value = 3
 background_colour = (100, 90, 100)  # original value = (0,0,51)
 scale_factor = 1.5  # scales the playerImage - original value = 1.75
 menu_colour = (100, 100, 100)  # grey menu background
-
 bulletSpeed = 11  # speed of bullets
-
 
 class Wall(pygame.sprite.Sprite):  # wall class
     def __init__(self, rect):
-        super().__init__()  # used to initialise parent class correctly
-        self.rect = pygame.Rect(rect)  # creates rect (pos + size of wall) , used for collision
-        self.image = pygame.Surface(self.rect.size) # creates surface same size as the wall
-        self.image.fill((0, 0, 0))  # fill image colour with black
-
+        super().__init__()  # initialise parent class correctly
+        self.rect = pygame.Rect(rect)  # rect stores position + size for collisions
+        self.image = pygame.Surface(self.rect.size)  # surface same size as wall
+        self.image.fill((0, 0, 0))  # wall colour black
 
 class Player:  # player class
     def __init__(self, pos):
         self.loadImages()  # loads and scales all sprites / images
-        self.direction = "down" # sets the player to face down when the game starts
-        self.image = self.images[self.direction] # selects the playerDown image
-        self.rect = self.image.get_rect(center=pos) # create rect
+        self.direction = "down"  # initial facing direction
+        self.image = self.images[self.direction]  # select starting image
+        self.rect = self.image.get_rect(center = pos)  # rectangle for collision
+        self.health = 100  # player health
+        self.score = 0  # player score
 
-    def loadImages(self):  # load and scale the player sprites
+    def loadImages(self):  # load and scale player sprites
         playerImages = {"up": pygame.image.load("playerUp.png"),
                         "down": pygame.image.load("playerDown.png"),
                         "left": pygame.image.load("playerLeft.png"),
-                        "right": pygame.image.load("playerRight.png")}  # player images for each direction
-        self.images = {} # stores scaled images
+                        "right": pygame.image.load("playerRight.png")}  # images per direction
+        self.images = {}
         for direction, image in playerImages.items():
-            w, h = image.get_size() # gets original width + height of image
-            self.images[direction] = pygame.transform.scale(image, (int(w * scale_factor), int(h * scale_factor)))
-            # scales image using scale_factor then stores it
+            w, h = image.get_size()  # original width + height
+            self.images[direction] = pygame.transform.scale(image, (int(w * scale_factor), int(h * scale_factor)))  # scale image
 
-    def collisionMovement(self, dx, dy, walls):  # moves then check for collisions
-        self.rect.x += dx # moves player horizontally
-        for wall in walls:
-            if self.rect.colliderect(wall.rect): # if a collision occurs
-                if dx > 0:
-                    self.rect.right = wall.rect.left # stops at left edge of wall
-                elif dx < 0:
-                    self.rect.left = wall.rect.right # stop at right edge of wall
-        self.rect.y += dy  # move vertically then check for collisions
-        for wall in walls:
+    def collisionMovement(self, dx, dy, walls):  # moves player and checks collisions
+        self.rect.x += dx  # horizontal move
+        for wall in walls:  # check horizontal collisions
             if self.rect.colliderect(wall.rect):
-                if dy > 0:
-                    self.rect.bottom = wall.rect.top # stop at top of wall
-                elif dy < 0:
-                    self.rect.top = wall.rect.bottom # stop at bottom of wall
+                if dx > 0: self.rect.right = wall.rect.left  # stop at left of wall
+                elif dx < 0: self.rect.left = wall.rect.right  # stop at right of wall
+        self.rect.y += dy  # vertical move
+        for wall in walls:  # check vertical collisions
+            if self.rect.colliderect(wall.rect):
+                if dy > 0: self.rect.bottom = wall.rect.top  # stop at top of wall
+                elif dy < 0: self.rect.top = wall.rect.bottom  # stop at bottom of wall
 
-    def handleInput(self, walls):  # handles the input in game (key movements (WASD) also arrow keys)
-        keys = pygame.key.get_pressed() # gets info on keyboard
-        dx, dy = 0, 0 # movement amount
+    def handleInput(self, walls):  # handle keyboard input
+        keys = pygame.key.get_pressed()
+        dx, dy = 0, 0
+        if keys[pygame.K_w] or keys[pygame.K_UP]: dy = -playerSpeed; self.direction = "up"
+        elif keys[pygame.K_s] or keys[pygame.K_DOWN]: dy = playerSpeed; self.direction = "down"
+        elif keys[pygame.K_a] or keys[pygame.K_LEFT]: dx = -playerSpeed; self.direction = "left"
+        elif keys[pygame.K_d] or keys[pygame.K_RIGHT]: dx = playerSpeed; self.direction = "right"
+        if dx or dy:  # if moving
+            self.image = self.images[self.direction]  # update sprite
+            self.collisionMovement(dx, dy, walls)  # check collisions
+        self.rect.clamp_ip(pygame.Rect(0, 0, width, height))  # stay on screen
 
-        # movement controls (works with WASD + Arrow keys) only one direction can work at a time
-        if keys[pygame.K_w] or keys[pygame.K_UP]: # if W key / UP arrow key is pressed
-            dy = -playerSpeed
-            self.direction = "up" # updates player direction to look up
-        elif keys[pygame.K_s] or keys[pygame.K_DOWN]: # if S key / DOWN arrow key is pressed
-            dy = playerSpeed
-            self.direction = "down" # updates player direction to look down
-        elif keys[pygame.K_a] or keys[pygame.K_LEFT]: # if A key / LEFT arrow key is pressed
-            dx = -playerSpeed
-            self.direction = "left" # updates player direction to look left
-        elif keys[pygame.K_d] or keys[pygame.K_RIGHT]: # if D key / RIGHT arrow key is pressed
-            dx = playerSpeed
-            self.direction = "right" # updates player direction to look right
-        if dx or dy: # if player moves
-            self.image = self.images[self.direction] # updates the player's image
-            self.collisionMovement(dx, dy, walls) # collision detection
-        self.rect.clamp_ip(pygame.Rect(0, 0, width, height))  # stops the player from leaving the screen
+    def draw(self, screen): screen.blit(self.image, self.rect)  # draw player
 
-    def draw(self, screen): # draws rect representing player
-        screen.blit(self.image, self.rect)
+class House:  # house structure class
+    def __init__(self, x, y, width, height, door_width = 60, door_side = None, vertical_door = None):
+        self.walls = pygame.sprite.Group()  # group to store all wall objects
+        self.x = x; self.y = y; self.width = width; self.height = height
+        self.door_width = door_width; self.door_side = door_side; self.vertical_door = vertical_door
+        self.create_walls()  # build house walls
 
-
-class House:  # house structure class, primarily used for dimensions of the house
-    def __init__(self, x, y, width, height, door_width=60, door_side=None, vertical_door=None):
-        # creates the walls for house and adds the door gaps
-        self.walls = pygame.sprite.Group() # group which stores wall objects
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
-        self.door_width = door_width # width of the door
-        self.door_side = door_side # which horizontal wall contains a door gap
-        self.vertical_door = vertical_door # which vertical wall contains a door gap
-        self.create_walls() # creates and builds the house walls
-
-    def create_walls(self):  # creates the walls needed for the houses / structures
-        door_size = self.door_width  # gap created for the player to enter the structures
-        sides = ['top', 'bottom', 'left', 'right']  # labels for the walls and wall position
+    def create_walls(self):  # creates walls with door gaps
+        door_size = self.door_width
+        sides = ['top', 'bottom', 'left', 'right']
         for side in sides:
-            if (side == self.door_side or side == self.vertical_door): # wall has door
+            if (side == self.door_side or side == self.vertical_door):  # wall has door
                 if side in ['top', 'bottom']:
                     y = self.y if side == 'top' else self.y + self.height - 10
-                    self.walls.add(Wall((self.x, y, (self.width - door_size) // 2, 10))) # left half
-                    self.walls.add(Wall((self.x + (self.width + door_size) // 2, y, (self.width - door_size) // 2, 10))) # right half
-                else:  # vertical door
+                    self.walls.add(Wall((self.x, y, (self.width - door_size) // 2, 10)))  # left part
+                    self.walls.add(Wall((self.x + (self.width + door_size) // 2, y, (self.width - door_size) // 2, 10)))  # right part
+                else:  # vertical wall with door
                     x = self.x if side == 'left' else self.x + self.width - 10
-                    self.walls.add(Wall((x, self.y, 10, (self.height - door_size) // 2)))
-                    self.walls.add(Wall((x, self.y + (self.height + door_size) // 2, 10, (self.height - door_size) // 2)))
-            else:  # regular wall
-                if side == 'top':
-                    self.walls.add(Wall((self.x, self.y, self.width, 10)))
-                elif side == 'bottom':
-                    self.walls.add(Wall((self.x, self.y + self.height - 10, self.width, 10)))
-                elif side == 'left':
-                    self.walls.add(Wall((self.x, self.y, 10, self.height)))
-                elif side == 'right':
-                    self.walls.add(Wall((self.x + self.width - 10, self.y, 10, self.height)))
+                    self.walls.add(Wall((x, self.y, 10, (self.height - door_size) // 2)))  # top
+                    self.walls.add(Wall((x, self.y + (self.height + door_size) // 2, 10, (self.height - door_size) // 2)))  # bottom
+            else:  # normal wall
+                if side == 'top': self.walls.add(Wall((self.x, self.y, self.width, 10)))
+                elif side == 'bottom': self.walls.add(Wall((self.x, self.y + self.height - 10, self.width, 10)))
+                elif side == 'left': self.walls.add(Wall((self.x, self.y, 10, self.height)))
+                elif side == 'right': self.walls.add(Wall((self.x + self.width - 10, self.y, 10, self.height)))
 
+class Zombie:  # enemy zombie class
+    def __init__(self, pos):
+        img = pygame.image.load("zombie.png") # zombie image
+        w, h = img.get_size()
+        self.image = pygame.transform.scale(img, (int(w * scale_factor), int(h * scale_factor)))
+        self.rect = self.image.get_rect(center = pos)
+        self.speed = 1.5
 
-class Bullet:  # bullet class
+    def moveTowardsPlayer(self, player, walls):  # simple pathfinding towards player
+        zombieX = self.rect.x; zombieY = self.rect.y # stores zombies current x pos
+        playerX = player.rect.x; playerY = player.rect.y # stores zombies current y pos
+        dx, dy = 0, 0
+        if playerX > zombieX: dx = self.speed # move right if player is to the right
+        elif playerX < zombieX: dx = -self.speed # move left if player is to the left
+        if playerY > zombieY: dy = self.speed  #  if player is below move down
+        elif playerY < zombieY: dy = -self.speed # if player is above move up
+        self.rect.x += dx
+        for wall in walls: # collision with walls horizontally
+            if self.rect.colliderect(wall.rect):
+                if dx > 0: self.rect.right = wall.rect.left
+                elif dx < 0: self.rect.left = wall.rect.right
+        self.rect.y += dy
+        for wall in walls: # collision with walls vertically
+            if self.rect.colliderect(wall.rect):
+                if dy > 0: self.rect.bottom = wall.rect.top
+                elif dy < 0: self.rect.top = wall.rect.bottom
+
+    def draw(self, screen): screen.blit(self.image, self.rect)  # draw zombie
+
+class Bullet:  # player bullet class
     def __init__(self, x, y, direction):
-        self.rect = pygame.Rect(x, y, 6, 6) # creates a small rectangle (6x6) as the bullet
-        self.direction = direction # bullet travels in the direction where player is facing
+        self.rect = pygame.Rect(x, y, 6, 6)  # small rectangle
+        self.direction = direction  # bullet direction
 
-    def moveBullet(self, walls=None): # bullet movement with wall collision
-        if self.direction == "up":  # bullet goes up
-            self.rect.y -= bulletSpeed
-        elif self.direction == "down":  # bullet goes down
-            self.rect.y += bulletSpeed
-        elif self.direction == "left":  # bullet goes left
-            self.rect.x -= bulletSpeed
-        elif self.direction == "right":  # bullet goes right
-            self.rect.x += bulletSpeed
-
-        # check collision with walls
-        if walls:  # only check if walls group is provided
+    def moveBullet(self, walls = None):  # move bullet and check wall collision
+        if self.direction == "up": self.rect.y -= bulletSpeed
+        elif self.direction == "down": self.rect.y += bulletSpeed
+        elif self.direction == "left": self.rect.x -= bulletSpeed
+        elif self.direction == "right": self.rect.x += bulletSpeed
+        if walls:
             for wall in walls:
-                if self.rect.colliderect(wall.rect):  # bullet hits wall
-                    return True  # indicate bullet should be removed
+                if self.rect.colliderect(wall.rect): return True
         return False
 
-    def draw(self, screen): # draws rect representing the bullet
-        pygame.draw.rect(screen, (255, 255, 0), self.rect)
+    def draw(self, screen): pygame.draw.rect(screen, (255, 255, 0), self.rect)  # draw bullet
 
+class Game:
+    def __init__(self):
+        pygame.init()  # initialise pygame
+        self.setupWindow()  # create game window
+        self.clock = pygame.time.Clock()  # FPS controller
+        self.running = True  # main loop flag
+        self.menuScreen()  # display main menu
+        self.startGame()  # initialise game
+        self.gunshot_sound = pygame.mixer.Sound("gunshot.mp3")  # gunshot sound
+        self.gunshot_sound.set_volume(0.05)  # set volume to 50
 
-class Game:  # game class
-    def __init__(self):  # sets up everything for the game
-        pygame.init() # initialises pygame modules
-        self.setupWindow() # create window
-        self.clock = pygame.time.Clock()  # controls FPS (frames per second)
-        self.running = True # controls main game loop
-        self.menuScreen()  # show menu before starting the game
-        self.player = Player((width // 2, height // 2)) # creates / spawns player in the centre of the screen
-        self.structures()  # creates the houses
-        self.bullets = []  # creates a list to store any active bullets
+    def structures(self): # strucutre class
+        self.walls = pygame.sprite.Group()
+        top_left_house = House(200, 120, 300, 150, door_side = 'bottom', vertical_door = 'left')
+        self.walls.add(top_left_house.walls)
+        bottom_right_house = House(900, 400, 180, 180, door_side = 'top', vertical_door = 'right')
+        self.walls.add(bottom_right_house.walls)
 
-    def setupWindow(self):  # method which is used to create the game window
+    def startGame(self):
+        self.player = Player((width // 2, height // 2))
+        self.structures()  # add houses/walls
+        self.bullets = []
+        self.zombies = []
+        for i in range(3):
+            self.spawnZombie()  # initial zombies
+
+    def setupWindow(self):
         self.screen = pygame.display.set_mode((width, height))
-        # creates the main game window (surface object)
-        pygame.display.set_caption("Top-down Zombie Game")  # sets window caption at the top
+        pygame.display.set_caption("Top-down Zombie Game")
 
-    def menuScreen(self):  # displays start menu before the main game begins
+    def menuScreen(self):
         playButton = pygame.Rect(width // 2 - 100, height // 2 - 25, 200, 50)
-        # ^ creates a rect for a play button
-        font = pygame.font.Font(None, 50) # create a font object
-        runningMenu = True # boolean used to control the menu loop
-        while runningMenu: # main menu loop  (runs until runningMenu is False)
-            self.screen.fill(menu_colour) # fills screen with background colour
-            mouse_pos = pygame.mouse.get_pos() # gets current mouse position
-            for event in pygame.event.get(): # checks every event (keyboard, mouse)
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    exit() # Fully closes the program
+        font = pygame.font.Font(None, 50)
+        runningMenu = True
+        while runningMenu:
+            self.screen.fill(menu_colour)
+            mouse_pos = pygame.mouse.get_pos()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: pygame.quit(); exit()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if playButton.collidepoint(mouse_pos):
-                        # ^ checks if mouse click happened inside button
-                        runningMenu = False # Ends menu loop and starts the game
+                    if playButton.collidepoint(mouse_pos): runningMenu = False
+            if playButton.collidepoint(mouse_pos): pygame.draw.rect(self.screen, (255, 255, 0), playButton, 3)
+            else: pygame.draw.rect(self.screen, (255, 255, 255), playButton, 3)
+            text = font.render("PLAY", True, (255, 255, 255))
+            text_rect = text.get_rect(center = playButton.center)
+            self.screen.blit(text, text_rect)
+            title_font = pygame.font.Font(None, 70)
+            title_text = title_font.render("ZOMBIE RUSH", True, (0, 255, 0))
+            title_rect = title_text.get_rect(center = (width // 2, height // 4))
+            self.screen.blit(title_text, title_rect)
+            pygame.display.flip()
+            self.clock.tick(60)
 
-            if playButton.collidepoint(mouse_pos):  # if mouse is currently hovering over the button
-                pygame.draw.rect(self.screen, (255, 255, 0), playButton, 3) # draws yellow outline around button
-            else:
-                pygame.draw.rect(self.screen, (255, 255, 255), playButton, 3) # becomes normal when not hovering
+    def spawnZombie(self):
+        side = random.choice(["top", "bottom", "left", "right"])
+        # randomly chooses where zombies spawn from
+        if side == "top":
+            pos = (random.randint(0, width), 0)
+        elif side == "bottom":
+            pos = (random.randint(0, width), height)
+        elif side == "left":
+            pos = (0, random.randint(0, height))
+        else:
+            pos = (width, random.randint(0, height))
+        if len(self.zombies) < 5: # if there is less than 5 zombies
+            self.zombies.append(Zombie(pos))  # create new zombie
 
-            text = font.render("PLAY", True, (255, 255, 255))  # Play text button
-            text_rect = text.get_rect(center=playButton.center) # creates a rectangle for text
-            self.screen.blit(text, text_rect) # draws the text onto the screen (at text_rect position)
+    def gameOverScreen(self):
+        button = pygame.Rect(width // 2 - 100, height // 2 + 50, 200, 50)
+        font = pygame.font.Font(None, 70)
+        small = pygame.font.Font(None, 50)
+        running = True
+        while running:
+            self.screen.fill(menu_colour) # grey background
+            mouse_pos = pygame.mouse.get_pos()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: pygame.quit(); exit()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if button.collidepoint(mouse_pos): running = False
+            if button.collidepoint(mouse_pos): pygame.draw.rect(self.screen, (255, 255, 0), button, 3)
+            else: pygame.draw.rect(self.screen, (255, 255, 255), button, 3)
+            text = font.render("GAME OVER", True, (255, 0, 0))
+            self.screen.blit(text, text.get_rect(center = (width // 2, height // 3)))
+            playAgainButton = small.render("PLAY AGAIN?", True, (255, 255, 255))
+            self.screen.blit(playAgainButton, playAgainButton.get_rect(center = button.center))
+            pygame.display.flip()
+            self.clock.tick(60)
 
-            title_font = pygame.font.Font(None, 70) # creates the title font
-            title_text = title_font.render("ZOMBIE RUSH", True, (0, 255, 0))  # renders title caption
-            title_rect = title_text.get_rect(center=(width // 2, height // 4)) # puts title in the middle but slightly higher
-            self.screen.blit(title_text, title_rect) # draws the title onto the screen
-            pygame.display.flip() # updates display
-            self.clock.tick(60)# 60 FPS menu
+    def handleEvents(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: self.running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    self.bullets.append(Bullet(self.player.rect.centerx, self.player.rect.centery, self.player.direction))
+                    self.gunshot_sound.play()  # play sound when shooting
 
-    def structures(self): # creates structures, such as houses for the player to use as cover
-        self.walls = pygame.sprite.Group() # creates group to store all wall objects
-        top_left_house = House(200, 120, 300, 150, door_side='bottom', vertical_door='left')
-        # first house with 2 doors
-        self.walls.add(top_left_house.walls) # adds all wall sprites from first house into main wall group
-        bottom_right_house = House(900, 400, 180, 180, door_side='top', vertical_door='right')
-        # second house with 2 doors
-        self.walls.add(bottom_right_house.walls) # adds second house walls to wall group
-
-    def handleEvents(self):  # handles all the runtime events (keyboard, quit, etc)
-        for event in pygame.event.get(): # loops through event
-            if event.type == pygame.QUIT:  # if player chooses to close the window
-                self.running = False # stop main game loop
-            if event.type == pygame.KEYDOWN: # detects when down key is pressed
-                if event.key == pygame.K_SPACE:  # if the space button is pressed
-                    bullet = Bullet(self.player.rect.centerx, self.player.rect.centery, self.player.direction)  # bullet
-                    self.bullets.append(bullet) # add bullet to the active bullet list
-
-    def update(self):  # update actions
+    def update(self): # update method
         self.player.handleInput(self.walls)
-        for bullet in self.bullets[:]:  # looping through a copy of the bullet list
-            if bullet.moveBullet(self.walls):  # remove bullet if it collides with wall
-                self.bullets.remove(bullet)
+        for bullet in self.bullets[:]:
+            if bullet.moveBullet(self.walls):
+                self.bullets.remove(bullet) # remove bullet when touching wall
             elif bullet.rect.right < 0 or bullet.rect.left > width or bullet.rect.bottom < 0 or bullet.rect.top > height:
-                self.bullets.remove(bullet)  # removes bullet once it leaves the screen
+                self.bullets.remove(bullet)
+        for zombie in self.zombies[:]:
+            zombie.moveTowardsPlayer(self.player, self.walls)
+            if zombie.rect.colliderect(self.player.rect): # if player touches the zombie
+                self.player.health -= 1 # decrease health by 1
+            for bullet in self.bullets[:]:
+                if zombie.rect.colliderect(bullet.rect): # if bullet touches zombie
+                    self.zombies.remove(zombie) # remove the zombie
+                    self.bullets.remove(bullet)
+                    self.player.score += 1 # increase player score by 1
+                    self.spawnZombie()
+                    break
+        if self.player.health <= 0: # game over when player has no health
+            self.gameOverScreen()
+            self.startGame() # starts the game again
 
-    def draw(self):  # draw background and objects
+    def draw(self):
         self.screen.fill(background_colour)
-        for wall in self.walls:
-            self.screen.blit(wall.image, wall.rect)
-        for bullet in self.bullets:
-            bullet.draw(self.screen)  # draws the bullet onto the screen
-        self.player.draw(self.screen)  # draw screen
-        pygame.display.flip()  # update the contents of the entire display
+        for wall in self.walls: self.screen.blit(wall.image, wall.rect)
+        for bullet in self.bullets: bullet.draw(self.screen)
+        for zombie in self.zombies: zombie.draw(self.screen)
+        self.player.draw(self.screen)
+        pygame.draw.rect(self.screen, (255, 0, 0), (20, 20, 200, 20))  # health bar background
+        pygame.draw.rect(self.screen, (0, 255, 0), (20, 20, self.player.health * 2, 20))  # health value
+        font = pygame.font.Font(None, 40)  # score display
+        score_text = font.render("Score: " + str(self.player.score), True, (255, 255, 255))
+        self.screen.blit(score_text, (20, 50))
+        pygame.display.flip()
 
-
-game = Game()  # create Game object
-
+# game
+game = Game()
 while game.running:
-    game.handleEvents()  # handling events in game
-    game.update()  # update game (positions)
-    game.draw()  # draws everything
-    game.clock.tick(60)  # FPS for the game -- LIMITED TO 60
+    game.handleEvents()
+    game.update()
+    game.draw()
+    game.clock.tick(60)
