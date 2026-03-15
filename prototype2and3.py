@@ -1,7 +1,8 @@
+
 import pygame  # imports pygame
 import random  # used for zombie spawning
 
-# ---------------- VARIABLES ----------------
+# start variables
 width = 1280  # width of screen - original value = 1280
 height = 720  # height of screen - original value = 720
 playerSpeed = 3  # original value = 3
@@ -90,7 +91,7 @@ class House:  # house structure class
 
 class Zombie:  # enemy zombie class
     def __init__(self, pos):
-        img = pygame.image.load("zombie.png")
+        img = pygame.image.load("zombie.png") # zombie image
         w, h = img.get_size()
         self.image = pygame.transform.scale(img, (int(w * scale_factor), int(h * scale_factor)))
         self.rect = self.image.get_rect(center = pos)
@@ -134,16 +135,46 @@ class Bullet:  # player bullet class
 
     def draw(self, screen): pygame.draw.rect(screen, (255, 255, 0), self.rect)  # draw bullet
 
+class PowerUp:  # POWERUP CLASS
+    def __init__(self, x, y, type):
+        self.type = type
+        img = pygame.image.load("powerupIcon.png")  # powerup image
+        w, h = img.get_size()
+        self.image = pygame.transform.scale(img, (int(w * 1), int(h * 1)))
+        self.rect = self.image.get_rect(center=(x, y))
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+
 class Game:
     def __init__(self):
         pygame.init()  # initialise pygame
         self.setupWindow()  # create game window
         self.clock = pygame.time.Clock()  # FPS controller
         self.running = True  # main loop flag
+        # wave variables
+        self.wave = 1
+        self.zombiesKilled = 0
+        # powerup variables
+        self.powerups = []
+        self.freezeActive = False
+        self.rapidFireActive = False
+        self.freezeTimer = 0
+        self.rapidTimer = 0
+        self.activeText = ""  # text display for powerup
+        self.textTimer = 0
+        self.lastShot = 0  # shoot timer
+        self.shootCooldown = 300
+
         self.menuScreen()  # display main menu
         self.startGame()  # initialise game
+
         self.gunshot_sound = pygame.mixer.Sound("gunshot.mp3")  # gunshot sound
         self.gunshot_sound.set_volume(0.05)  # set volume to 50
+        self.waveComplete = pygame.mixer.Sound("waveComplete.mp3")  # sound for wave completion
+        self.waveComplete.set_volume(0.20)
+        self.gameOverMusic = pygame.mixer.Sound("gameOverMusic.mp3")  # game over sound
+        self.gameOverMusic.set_volume(0.05)
 
     def structures(self): # strucutre class
         self.walls = pygame.sprite.Group()
@@ -154,9 +185,19 @@ class Game:
 
     def startGame(self):
         self.player = Player((width // 2, height // 2))
+        self.wave = 1  # reset wave to 1
+        self.zombiesKilled = 0  # reset kill count
         self.structures()  # add houses/walls
         self.bullets = []
         self.zombies = []
+        self.powerups = []
+        # Reset powerup states when game restarts
+        self.freezeActive = False
+        self.rapidFireActive = False
+        self.freezeTimer = 0
+        self.rapidTimer = 0
+        self.activeText = ""
+        self.textTimer = 0
         for i in range(3):
             self.spawnZombie()  # initial zombies
 
@@ -197,16 +238,16 @@ class Game:
             pos = (0, random.randint(0, height))
         else:
             pos = (width, random.randint(0, height))
-        if len(self.zombies) < 5:
-            self.zombies.append(Zombie(pos))  # max 5 zombies
+        if len(self.zombies) < 5 + self.wave:
+            self.zombies.append(Zombie(pos))
 
     def gameOverScreen(self):
         button = pygame.Rect(width // 2 - 100, height // 2 + 50, 200, 50)
         font = pygame.font.Font(None, 70)
-        small = pygame.font.Font(None, 50)
+        small = pygame.font.Font(None, 30)
         running = True
         while running:
-            self.screen.fill(menu_colour) # grey background
+            self.screen.fill(menu_colour)
             mouse_pos = pygame.mouse.get_pos()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: pygame.quit(); exit()
@@ -226,42 +267,108 @@ class Game:
             if event.type == pygame.QUIT: self.running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    self.bullets.append(Bullet(self.player.rect.centerx, self.player.rect.centery, self.player.direction))
-                    self.gunshot_sound.play()  # play sound when shooting
+                    now = pygame.time.get_ticks()
+                    cooldown = 100 if self.rapidFireActive else self.shootCooldown  # RAPID FIRE REDUCES COOLDOWN
+                    if now - self.lastShot > cooldown:
+                        self.bullets.append(Bullet(self.player.rect.centerx, self.player.rect.centery, self.player.direction))
+                        self.gunshot_sound.play()
+                        self.lastShot = now
 
-    def update(self):
+    def update(self): # update method
         self.player.handleInput(self.walls)
         for bullet in self.bullets[:]:
             if bullet.moveBullet(self.walls):
                 self.bullets.remove(bullet)
             elif bullet.rect.right < 0 or bullet.rect.left > width or bullet.rect.bottom < 0 or bullet.rect.top > height:
                 self.bullets.remove(bullet)
+
         for zombie in self.zombies[:]:
-            zombie.moveTowardsPlayer(self.player, self.walls)
+            if not self.freezeActive:  # FREEZE POWERUP STOPS MOVEMENT
+                zombie.moveTowardsPlayer(self.player, self.walls)
             if zombie.rect.colliderect(self.player.rect):
                 self.player.health -= 1
+
             for bullet in self.bullets[:]:
                 if zombie.rect.colliderect(bullet.rect):
                     self.zombies.remove(zombie)
                     self.bullets.remove(bullet)
                     self.player.score += 1
+                    self.zombiesKilled += 1
+                    if self.zombiesKilled % 5 == 0:
+                        self.wave += 1  # increase wave by 1
+                        self.waveComplete.play()
+                    if random.random() < 0.1: # 10% drop chance of powerup
+                        pType = random.choice(["freeze","rapid","hp"])
+                        self.powerups.append(PowerUp(zombie.rect.centerx, zombie.rect.centery, pType))
                     self.spawnZombie()
                     break
-        if self.player.health <= 0:
-            self.gameOverScreen()
-            self.startGame()
+
+        # POWERUP COLLECTION
+        for powerup in self.powerups[:]:
+            if powerup.rect.colliderect(self.player.rect):
+                now = pygame.time.get_ticks()
+                if powerup.type == "freeze": # freeze powerup
+                    self.freezeActive = True
+                    self.freezeTimer = now
+                    self.activeText = "FREEZE (10s)"
+                    self.textTimer = now
+                elif powerup.type == "rapid": # rapid fire powerup
+                    self.rapidFireActive = True
+                    self.rapidTimer = now
+                    self.activeText = "RAPID FIRE (10s)"
+                    self.textTimer = now
+                elif powerup.type == "hp": # health powerup
+                    if self.player.health < 100: # only used if player is low
+                        self.player.health = min(100, self.player.health + 20)
+                        self.activeText = "HP +20"
+                        self.textTimer = now
+                self.powerups.remove(powerup) # removes powerup when done
+        # POWERUP TIMERS
+        now = pygame.time.get_ticks()
+        if self.freezeActive:
+            remaining = 10 - int((now - self.freezeTimer)/1000)
+            self.activeText = "FREEZE (" + str(max(0,remaining)) + "s)" # displays freeze text
+            if now - self.freezeTimer > 10000:
+                self.freezeActive = False
+        if self.rapidFireActive:
+            remaining = 10 - int((now - self.rapidTimer)/1000)
+            self.activeText = "RAPID FIRE (" + str(max(0,remaining)) + "s)" # displays rapid text
+            if now - self.rapidTimer > 10000:
+                self.rapidFireActive = False
+        # CLEAR POWERUP TEXT AFTER 10 SECONDS
+        if self.activeText != "" and pygame.time.get_ticks() - self.textTimer > 10000:
+            if now - self.textTimer > 10000:
+                self.activeText = ""
+
+        if self.player.health <= 0:  # if player's hp reaches 0
+            self.gameOverMusic.play()  # PLAY GAME OVER MUSIC
+            self.gameOverScreen()  # show game over screen
+            self.startGame()  # reset game if play again
 
     def draw(self):
         self.screen.fill(background_colour)
-        for wall in self.walls: self.screen.blit(wall.image, wall.rect)
-        for bullet in self.bullets: bullet.draw(self.screen)
-        for zombie in self.zombies: zombie.draw(self.screen)
+        for wall in self.walls:
+            self.screen.blit(wall.image, wall.rect)
+        for bullet in self.bullets:
+            bullet.draw(self.screen)
+        for zombie in self.zombies:
+            zombie.draw(self.screen)
+        for powerup in self.powerups:
+            powerup.draw(self.screen)
         self.player.draw(self.screen)
-        pygame.draw.rect(self.screen, (255, 0, 0), (20, 20, 200, 20))  # health bar background
-        pygame.draw.rect(self.screen, (0, 255, 0), (20, 20, self.player.health * 2, 20))  # health value
-        font = pygame.font.Font(None, 40)  # score display
+
+        pygame.draw.rect(self.screen, (255, 0, 0), (20, 20, 200, 20))
+        pygame.draw.rect(self.screen, (0, 255, 0), (20, 20, self.player.health * 2, 20))
+        font = pygame.font.Font(None, 40)
         score_text = font.render("Score: " + str(self.player.score), True, (255, 255, 255))
         self.screen.blit(score_text, (20, 50))
+        wave_font = pygame.font.Font(None, 40)
+        wave_text = wave_font.render("Wave: " + str(self.wave), True, (255,255,255))
+        self.screen.blit(wave_text, (width - 150, 20))
+        if self.activeText != "":
+            pfont = pygame.font.Font(None, 50)
+            ptext = pfont.render(self.activeText, True, (255,255,0))
+            self.screen.blit(ptext, ptext.get_rect(center=(width//2,40)))
         pygame.display.flip()
 
 # game
